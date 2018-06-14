@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package pkcs12
+package gopkcs12
 
 import (
 	"bytes"
@@ -106,10 +106,10 @@ func pbDecrypt(info decryptable, password []byte) (decrypted []byte, err error) 
 
 	encrypted := info.Data()
 	if len(encrypted) == 0 {
-		return nil, errors.New("pkcs12: empty encrypted data")
+		return nil, errors.New("gopkcs12: empty encrypted data")
 	}
 	if len(encrypted)%blockSize != 0 {
-		return nil, errors.New("pkcs12: input is not a multiple of the block size")
+		return nil, errors.New("gopkcs12: input is not a multiple of the block size")
 	}
 	decrypted = make([]byte, len(encrypted))
 	cbc.CryptBlocks(decrypted, encrypted)
@@ -139,7 +139,7 @@ func pad(src []byte, blockSize int) []byte {
 
 func pbEncrypt(plainText, salt, password []byte, iterations int) (cipherText []byte, err error) {
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return nil, errors.New("pkcs12: failed to create a random salt value: " + err.Error())
+		return nil, errors.New("gopkcs12: failed to create a random salt value: " + err.Error())
 	}
 
 	cipherType := shaWithTripleDESCBC{}
@@ -148,7 +148,7 @@ func pbEncrypt(plainText, salt, password []byte, iterations int) (cipherText []b
 
 	block, err := cipherType.create(key)
 	if err != nil {
-		return nil, errors.New("pkcs12: failed to create a block cipher: " + err.Error())
+		return nil, errors.New("gopkcs12: failed to create a block cipher: " + err.Error())
 	}
 
 	paddedPlainText := pad(plainText, block.BlockSize())

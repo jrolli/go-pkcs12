@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package pkcs12 implements some of PKCS#12.
+// Package gopkcs12 implements some of PKCS#12.
 //
 // This implementation is distilled from https://tools.ietf.org/html/rfc7292
 // and referenced documents. It is intended for decoding P12/PFX-stored
 // certificates and keys for use with the crypto/tls package.
-package pkcs12
+package gopkcs12
 
 import (
 	"crypto/ecdsa"
@@ -99,7 +99,7 @@ func unmarshal(in []byte, out interface{}) error {
 		return err
 	}
 	if len(trailing) != 0 {
-		return errors.New("pkcs12: trailing data found")
+		return errors.New("gopkcs12: trailing data found")
 	}
 	return nil
 }
@@ -185,7 +185,7 @@ func convertAttribute(attribute *pkcs12Attribute) (key, value string, err error)
 		key = "Microsoft CSP Name"
 		isString = true
 	default:
-		return "", "", errors.New("pkcs12: unknown attribute with OID " + attribute.Id.String())
+		return "", "", errors.New("gopkcs12: unknown attribute with OID " + attribute.Id.String())
 	}
 
 	if isString {
@@ -221,7 +221,7 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 	}
 
 	if len(bags) != 2 {
-		err = errors.New("pkcs12: expected exactly two safe bags in the PFX PDU")
+		err = errors.New("gopkcs12: expected exactly two safe bags in the PFX PDU")
 		return
 	}
 
@@ -229,7 +229,7 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 		switch {
 		case bag.Id.Equal(oidCertBag):
 			if certificate != nil {
-				err = errors.New("pkcs12: expected exactly one certificate bag")
+				err = errors.New("gopkcs12: expected exactly one certificate bag")
 			}
 
 			certsData, err := decodeCertBag(bag.Value.Bytes)
@@ -241,14 +241,14 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 				return nil, nil, err
 			}
 			if len(certs) != 1 {
-				err = errors.New("pkcs12: expected exactly one certificate in the certBag")
+				err = errors.New("gopkcs12: expected exactly one certificate in the certBag")
 				return nil, nil, err
 			}
 			certificate = certs[0]
 
 		case bag.Id.Equal(oidPKCS8ShroudedKeyBag):
 			if privateKey != nil {
-				err = errors.New("pkcs12: expected exactly one key bag")
+				err = errors.New("gopkcs12: expected exactly one key bag")
 			}
 			if privateKey, err = decodePkcs8ShroudedKeyBag(bag.Value.Bytes, encodedPassword); err != nil {
 				return nil, nil, err
@@ -257,10 +257,10 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 	}
 
 	if certificate == nil {
-		return nil, nil, errors.New("pkcs12: certificate missing")
+		return nil, nil, errors.New("gopkcs12: certificate missing")
 	}
 	if privateKey == nil {
-		return nil, nil, errors.New("pkcs12: private key missing")
+		return nil, nil, errors.New("gopkcs12: private key missing")
 	}
 
 	return
@@ -453,7 +453,7 @@ func getSafeContents(p12Data, password []byte) (bags []safeBag, updatedPassword 
 	pfx := new(pfxPdu)
 
 	if err := unmarshal(p12Data, pfx); err != nil {
-		return nil, nil, errors.New("pkcs12: error reading P12 data: " + err.Error())
+		return nil, nil, errors.New("gopkcs12: error reading P12 data: " + err.Error())
 	}
 
 	if pfx.Version != 3 {
@@ -470,7 +470,7 @@ func getSafeContents(p12Data, password []byte) (bags []safeBag, updatedPassword 
 	}
 
 	if len(pfx.MacData.Mac.Algorithm.Algorithm) == 0 {
-		return nil, nil, errors.New("pkcs12: no MAC in data")
+		return nil, nil, errors.New("gopkcs12: no MAC in data")
 	}
 
 	if err := verifyMac(&pfx.MacData, pfx.AuthSafe.Content.Bytes, password); err != nil {

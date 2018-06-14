@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package pkcs12
+package gopkcs12
 
 import (
 	"errors"
@@ -22,7 +22,7 @@ func bmpString(s string) ([]byte, error) {
 
 	for _, r := range s {
 		if t, _ := utf16.EncodeRune(r); t != 0xfffd {
-			return nil, errors.New("pkcs12: string contains characters that cannot be encoded in UCS-2")
+			return nil, errors.New("gopkcs12: string contains characters that cannot be encoded in UCS-2")
 		}
 		ret = append(ret, byte(r/256), byte(r%256))
 	}
@@ -32,7 +32,7 @@ func bmpString(s string) ([]byte, error) {
 
 func decodeBMPString(bmpString []byte) (string, error) {
 	if len(bmpString)%2 != 0 {
-		return "", errors.New("pkcs12: odd-length BMP string")
+		return "", errors.New("gopkcs12: odd-length BMP string")
 	}
 
 	// strip terminator if present

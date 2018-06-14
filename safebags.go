@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package pkcs12
+package gopkcs12
 
 import (
 	"crypto/x509"
@@ -36,22 +36,22 @@ func encodePkcs8ShroudedKeyBag(privateKey interface{}, password []byte) (bytes [
 	privateKeyBytes, err := marshalPKCS8PrivateKey(privateKey)
 
 	if err != nil {
-		return nil, errors.New("pkcs12: error encoding PKCS#8 private key: " + err.Error())
+		return nil, errors.New("gopkcs12: error encoding PKCS#8 private key: " + err.Error())
 	}
 
 	salt, err := makeSalt(pbeSaltSizeBytes)
 	if err != nil {
-		return nil, errors.New("pkcs12: error creating PKCS#8 salt: " + err.Error())
+		return nil, errors.New("gopkcs12: error creating PKCS#8 salt: " + err.Error())
 	}
 
 	pkData, err := pbEncrypt(privateKeyBytes, salt, password, pbeIterationCount)
 	if err != nil {
-		return nil, errors.New("pkcs12: error encoding PKCS#8 shrouded key bag when encrypting cert bag: " + err.Error())
+		return nil, errors.New("gopkcs12: error encoding PKCS#8 shrouded key bag when encrypting cert bag: " + err.Error())
 	}
 
 	params, err := getAlgorithmParams(salt, pbeIterationCount)
 	if err != nil {
-		return nil, errors.New("pkcs12: error encoding PKCS#8 shrouded key bag algorithm's parameters: " + err.Error())
+		return nil, errors.New("gopkcs12: error encoding PKCS#8 shrouded key bag algorithm's parameters: " + err.Error())
 	}
 
 	pkinfo := encryptedPrivateKeyInfo{
@@ -64,7 +64,7 @@ func encodePkcs8ShroudedKeyBag(privateKey interface{}, password []byte) (bytes [
 
 	bytes, err = asn1.Marshal(pkinfo)
 	if err != nil {
-		return nil, errors.New("pkcs12: error encoding PKCS#8 shrouded key bag: " + err.Error())
+		return nil, errors.New("gopkcs12: error encoding PKCS#8 shrouded key bag: " + err.Error())
 	}
 
 	return bytes, err
@@ -73,21 +73,21 @@ func encodePkcs8ShroudedKeyBag(privateKey interface{}, password []byte) (bytes [
 func decodePkcs8ShroudedKeyBag(asn1Data, password []byte) (privateKey interface{}, err error) {
 	pkinfo := new(encryptedPrivateKeyInfo)
 	if err = unmarshal(asn1Data, pkinfo); err != nil {
-		return nil, errors.New("pkcs12: error decoding PKCS#8 shrouded key bag: " + err.Error())
+		return nil, errors.New("gopkcs12: error decoding PKCS#8 shrouded key bag: " + err.Error())
 	}
 
 	pkData, err := pbDecrypt(pkinfo, password)
 	if err != nil {
-		return nil, errors.New("pkcs12: error decrypting PKCS#8 shrouded key bag: " + err.Error())
+		return nil, errors.New("gopkcs12: error decrypting PKCS#8 shrouded key bag: " + err.Error())
 	}
 
 	ret := new(asn1.RawValue)
 	if err = unmarshal(pkData, ret); err != nil {
-		return nil, errors.New("pkcs12: error unmarshalling decrypted private key: " + err.Error())
+		return nil, errors.New("gopkcs12: error unmarshalling decrypted private key: " + err.Error())
 	}
 
 	if privateKey, err = x509.ParsePKCS8PrivateKey(pkData); err != nil {
-		return nil, errors.New("pkcs12: error parsing PKCS#8 private key: " + err.Error())
+		return nil, errors.New("gopkcs12: error parsing PKCS#8 private key: " + err.Error())
 	}
 
 	return privateKey, nil
@@ -96,7 +96,7 @@ func decodePkcs8ShroudedKeyBag(asn1Data, password []byte) (privateKey interface{
 func decodeCertBag(asn1Data []byte) (x509Certificates []byte, err error) {
 	bag := new(certBag)
 	if err := unmarshal(asn1Data, bag); err != nil {
-		return nil, errors.New("pkcs12: error decoding cert bag: " + err.Error())
+		return nil, errors.New("gopkcs12: error decoding cert bag: " + err.Error())
 	}
 	if !bag.Id.Equal(oidCertTypeX509Certificate) {
 		return nil, NotImplementedError("only X509 certificates are supported")
