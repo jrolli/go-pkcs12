@@ -8,18 +8,11 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"crypto/des"
-	"crypto/rand"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
-	"io"
 
 	"github.com/jrolli/gopkcs12/rc2"
-)
-
-const (
-	pbeIterationCount = 2048
-	pbeSaltSizeBytes  = 8
 )
 
 var (
@@ -70,7 +63,7 @@ type pbeParams struct {
 	Iterations int
 }
 
-func pbDecrypterFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.BlockMode, int, error) {
+func pbeCipherFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.Block, []byte, error) {
 	var cipherType pbeCipher
 
 	switch {
@@ -79,18 +72,27 @@ func pbDecrypterFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher
 	case algorithm.Algorithm.Equal(oidPBEWithSHAAnd40BitRC2CBC):
 		cipherType = shaWith40BitRC2CBC{}
 	default:
-		return nil, 0, NotImplementedError("algorithm " + algorithm.Algorithm.String() + " is not supported")
+		return nil, nil, NotImplementedError("algorithm " + algorithm.Algorithm.String() + " is not supported")
 	}
 
 	var params pbeParams
 	if err := unmarshal(algorithm.Parameters.FullBytes, &params); err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	key := cipherType.deriveKey(params.Salt, password, params.Iterations)
 	iv := cipherType.deriveIV(params.Salt, password, params.Iterations)
 
 	block, err := cipherType.create(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return block, iv, nil
+}
+
+func pbDecrypterFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.BlockMode, int, error) {
+	block, iv, err := pbeCipherFor(algorithm, password)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -106,10 +108,10 @@ func pbDecrypt(info decryptable, password []byte) (decrypted []byte, err error) 
 
 	encrypted := info.Data()
 	if len(encrypted) == 0 {
-		return nil, errors.New("gopkcs12: empty encrypted data")
+		return nil, errors.New("pkcs12: empty encrypted data")
 	}
 	if len(encrypted)%blockSize != 0 {
-		return nil, errors.New("gopkcs12: input is not a multiple of the block size")
+		return nil, errors.New("pkcs12: input is not a multiple of the block size")
 	}
 	decrypted = make([]byte, len(encrypted))
 	cbc.CryptBlocks(decrypted, encrypted)
@@ -131,37 +133,40 @@ func pbDecrypt(info decryptable, password []byte) (decrypted []byte, err error) 
 	return
 }
 
-func pad(src []byte, blockSize int) []byte {
-	paddingLength := blockSize - len(src)%blockSize
-	paddingText := bytes.Repeat([]byte{byte(paddingLength)}, paddingLength)
-	return append(src, paddingText...)
-}
-
-func pbEncrypt(plainText, salt, password []byte, iterations int) (cipherText []byte, err error) {
-	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
-		return nil, errors.New("gopkcs12: failed to create a random salt value: " + err.Error())
-	}
-
-	cipherType := shaWithTripleDESCBC{}
-	key := cipherType.deriveKey(salt, password, iterations)
-	iv := cipherType.deriveIV(salt, password, iterations)
-
-	block, err := cipherType.create(key)
-	if err != nil {
-		return nil, errors.New("gopkcs12: failed to create a block cipher: " + err.Error())
-	}
-
-	paddedPlainText := pad(plainText, block.BlockSize())
-
-	encrypter := cipher.NewCBCEncrypter(block, iv)
-	cipherText = make([]byte, len(paddedPlainText))
-	encrypter.CryptBlocks(cipherText, paddedPlainText)
-
-	return cipherText, nil
-}
-
 // decryptable abstracts a object that contains ciphertext.
 type decryptable interface {
 	Algorithm() pkix.AlgorithmIdentifier
 	Data() []byte
+}
+
+func pbEncrypterFor(algorithm pkix.AlgorithmIdentifier, password []byte) (cipher.BlockMode, int, error) {
+	block, iv, err := pbeCipherFor(algorithm, password)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return cipher.NewCBCEncrypter(block, iv), block.BlockSize(), nil
+}
+
+func pbEncrypt(info encryptable, decrypted []byte, password []byte) error {
+	cbc, blockSize, err := pbEncrypterFor(info.Algorithm(), password)
+	if err != nil {
+		return err
+	}
+
+	psLen := blockSize - len(decrypted)%blockSize
+	encrypted := make([]byte, len(decrypted)+psLen)
+	copy(encrypted[:len(decrypted)], decrypted)
+	copy(encrypted[len(decrypted):], bytes.Repeat([]byte{byte(psLen)}, psLen))
+	cbc.CryptBlocks(encrypted, encrypted)
+
+	info.SetData(encrypted)
+
+	return nil
+}
+
+// encryptable abstracts a object that contains ciphertext.
+type encryptable interface {
+	Algorithm() pkix.AlgorithmIdentifier
+	SetData([]byte)
 }

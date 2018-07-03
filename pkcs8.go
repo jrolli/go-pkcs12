@@ -1,10 +1,12 @@
-// Copyright 2016 The Go Authors. All rights reserved.
+// Copyright 2015 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+
 package gopkcs12
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -12,56 +14,64 @@ import (
 	"errors"
 )
 
-// pkcs8 reflects an ASN.1, PKCS#8 PrivateKey. See
-// ftp://ftp.rsasecurity.com/pub/pkcs/pkcs-8/pkcs-8v1_2.asn
-// and RFC5208.
-type pkcs8 struct {
+type pkcs8 struct { // Duplicated from x509 package
 	Version    int
 	Algo       pkix.AlgorithmIdentifier
 	PrivateKey []byte
-	// optional attributes omitted.
 }
 
-var (
+var ( // Duplicated from x509 package
 	oidPublicKeyRSA   = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 1, 1}
 	oidPublicKeyECDSA = asn1.ObjectIdentifier{1, 2, 840, 10045, 2, 1}
-
-	nullAsn = asn1.RawValue{Tag: 5}
 )
 
-// marshalPKCS8PrivateKey converts a private key to PKCS#8 encoded form.
-// See http://www.rsa.com/rsalabs/node.asp?id=2130 and RFC5208.
-func marshalPKCS8PrivateKey(key interface{}) (der []byte, err error) {
-	pkcs := pkcs8{
-		Version: 0,
+var ( // Duplicated from x509 package
+	oidNamedCurveP224 = asn1.ObjectIdentifier{1, 3, 132, 0, 33}
+	oidNamedCurveP256 = asn1.ObjectIdentifier{1, 2, 840, 10045, 3, 1, 7}
+	oidNamedCurveP384 = asn1.ObjectIdentifier{1, 3, 132, 0, 34}
+	oidNamedCurveP521 = asn1.ObjectIdentifier{1, 3, 132, 0, 35}
+)
+
+func oidFromNamedCurve(curve elliptic.Curve) (asn1.ObjectIdentifier, bool) { // Duplicated from x509 package
+	switch curve {
+	case elliptic.P224():
+		return oidNamedCurveP224, true
+	case elliptic.P256():
+		return oidNamedCurveP256, true
+	case elliptic.P384():
+		return oidNamedCurveP384, true
+	case elliptic.P521():
+		return oidNamedCurveP521, true
 	}
 
+	return nil, false
+}
+
+func marshalPKCS8PrivateKey(key interface{}) (der []byte, err error) {
+	var privKey pkcs8
 	switch key := key.(type) {
 	case *rsa.PrivateKey:
-		pkcs.Algo = pkix.AlgorithmIdentifier{
-			Algorithm:  oidPublicKeyRSA,
-			Parameters: nullAsn,
+		privKey.Algo.Algorithm = oidPublicKeyRSA
+		// This is a NULL parameters value which is technically
+		// superfluous, but most other code includes it.
+		privKey.Algo.Parameters = asn1.RawValue{
+			Tag: 5,
 		}
-		pkcs.PrivateKey = x509.MarshalPKCS1PrivateKey(key)
+		privKey.PrivateKey = x509.MarshalPKCS1PrivateKey(key)
 	case *ecdsa.PrivateKey:
-		bytes, err := x509.MarshalECPrivateKey(key)
-		if err != nil {
-			return nil, errors.New("x509: failed to marshal to PKCS#8: " + err.Error())
+		privKey.Algo.Algorithm = oidPublicKeyECDSA
+		namedCurveOID, ok := oidFromNamedCurve(key.Curve)
+		if !ok {
+			return nil, errors.New("pkcs12: unknown elliptic curve")
 		}
-
-		pkcs.Algo = pkix.AlgorithmIdentifier{
-			Algorithm:  oidPublicKeyECDSA,
-			Parameters: nullAsn,
+		if privKey.Algo.Parameters.FullBytes, err = asn1.Marshal(namedCurveOID); err != nil {
+			return nil, errors.New("pkcs12: failed to embed OID of named curve in PKCS#8: " + err.Error())
 		}
-		pkcs.PrivateKey = bytes
+		if privKey.PrivateKey, err = x509.MarshalECPrivateKey(key); err != nil {
+			return nil, errors.New("pkcs12: failed to embed EC private key in PKCS#8: " + err.Error())
+		}
 	default:
-		return nil, errors.New("x509: PKCS#8 only RSA and ECDSA private keys supported")
+		return nil, errors.New("pkcs12: only RSA and ECDSA private keys supported")
 	}
-
-	bytes, err := asn1.Marshal(pkcs)
-	if err != nil {
-		return nil, errors.New("x509: failed to marshal to PKCS#8: " + err.Error())
-	}
-
-	return bytes, nil
+	return asn1.Marshal(privKey)
 }
