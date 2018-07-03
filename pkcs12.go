@@ -224,8 +224,8 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 		return nil, nil, err
 	}
 
-	if len(bags) != 2 {
-		err = errors.New("pkcs12: expected exactly two safe bags in the PFX PDU")
+	if len(bags) > 3 {
+		err = errors.New("pkcs12: expected at most 3 safe bags in the PFX PDU")
 		return
 	}
 
