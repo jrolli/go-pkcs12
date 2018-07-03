@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
-	"fmt"
 )
 
 var (
@@ -225,19 +224,11 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 		return nil, nil, nil, err
 	}
 
-	if len(bags) > 3 {
-		err = errors.New(fmt.Sprintf("pkcs12: expected max of 3 safe bags in the PFX PDU but had %d", len(bags)))
-		return
-	}
+	caCerts = []*x509.Certificate{}
 
 	for _, bag := range bags {
 		switch {
 		case bag.Id.Equal(oidCertBag):
-			if certificate != nil {
-				err = errors.New("pkcs12: expected exactly one certificate bag")
-				return nil, nil, nil, err
-			}
-
 			certsData, err := decodeCertBag(bag.Value.Bytes)
 			if err != nil {
 				return nil, nil, nil, err
@@ -250,7 +241,18 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 				err = errors.New("pkcs12: expected exactly one certificate in the certBag")
 				return nil, nil, nil, err
 			}
-			certificate = certs[0]
+
+			for _, attr := range bag.Attributes {
+				if attr.Id.Equal(oidLocalKeyID) {
+					if certificate != nil {
+						err = errors.New("pkcs12: expected only one certificate for key")
+						return nil, nil, nil, err
+					}
+					certificate = certs[0]
+				} else {
+					caCerts = append(caCerts, certs...)
+				}
+			}
 
 		case bag.Id.Equal(oidPKCS8ShroudedKeyBag):
 			if privateKey != nil {
