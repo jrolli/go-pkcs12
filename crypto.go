@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gopkcs12
+package pkcs12
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"encoding/asn1"
 	"errors"
 
-	"github.com/jrolli/gopkcs12/rc2"
+	"github.com/jrolli/go-pkcs12/rc2"
 )
 
 var (

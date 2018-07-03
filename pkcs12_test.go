@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package gopkcs12
+package pkcs12
 
 import (
 	"crypto/rsa"

@@ -7,7 +7,7 @@
 // This implementation is distilled from https://tools.ietf.org/html/rfc7292
 // and referenced documents. It is intended for decoding P12/PFX-stored
 // certificates and keys for use with the crypto/tls package.
-package gopkcs12
+package pkcs12
 
 import (
 	"crypto/ecdsa"
