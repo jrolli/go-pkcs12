@@ -242,6 +242,8 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 				return nil, nil, nil, err
 			}
 
+			localKeyID := false
+
 			for _, attr := range bag.Attributes {
 				if attr.Id.Equal(oidLocalKeyID) {
 					if certificate != nil {
@@ -249,9 +251,13 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 						return nil, nil, nil, err
 					}
 					certificate = certs[0]
-				} else {
-					caCerts = append(caCerts, certs...)
+					localKeyID = true
+					break
 				}
+			}
+
+			if !localKeyID {
+				caCerts = append(caCerts, certs...)
 			}
 
 		case bag.Id.Equal(oidPKCS8ShroudedKeyBag):
@@ -275,8 +281,6 @@ func Decode(pfxData []byte, password string) (privateKey interface{}, certificat
 	if privateKey == nil {
 		return nil, nil, nil, errors.New("pkcs12: private key missing")
 	}
-
-	caCerts = nil
 
 	return
 }
